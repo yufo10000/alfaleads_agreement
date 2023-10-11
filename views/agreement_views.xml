@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="alfaleads_agreement_agreement_process_form" model="ir.ui.view">
+        <field name="name">alfaleads_agreement.agreement_process.form</field>
+        <field name="model">alfaleads_agreement.agreement_process</field>
+        <field name="arch" type="xml">
+            <form string="Agreement process">
+                <header>
+                    <field name="status" widget="statusbar" />
+                </header>
+                <sheet>
+                    <group>
+                        <field name="current_step" />
+                        <field name="route" />
+                        <field name="tasks" readonly="1" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="alfaleads_agreement_agreement_route_line_tree" model="ir.ui.view">
+        <field name="name">alfaleads_agreement.agreement_route_line.tree</field>
+        <field name="model">alfaleads_agreement.agreement_route_line</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom" default_order="create_date">
+                <field name="create_date" invisible="1" />
+                <field name="idx" />
+                <field name="approvers" widget="many2many_tags" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="alfaleads_agreement_agreement_task_tree" model="ir.ui.view">
+        <field name="name">alfaleads_agreement.agreement_task.tree</field>
+        <field name="model">alfaleads_agreement.agreement_task</field>
+        <field name="arch" type="xml">
+            <tree default_order="create_date">
+                <field name="create_date" invisible="1" />
+                <field name="idx" />
+                <field name="approver" />
+                <field name="status" />
+                <field name="approver_comments" />
+            </tree>
+        </field>
+    </record>
+</odoo>

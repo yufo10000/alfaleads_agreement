@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_agreement,access_agreement,model_alfaleads_agreement_agreement,base.group_user,1,1,1,1
+access_agreement_process,access_agreement_process,model_alfaleads_agreement_agreement_process,base.group_user,1,1,1,1
+access_agreement_step,access_agreement_step,model_alfaleads_agreement_agreement_step,base.group_user,1,1,1,1
+access_agreement_task,access_agreement_task,model_alfaleads_agreement_agreement_task,base.group_user,1,1,1,1
+access_agreement_route_ref,access_agreement_route_ref,model_alfaleads_agreement_agreement_route_ref,base.group_user,1,1,1,1
+access_agreement_route_line,access_agreement_route_line,model_alfaleads_agreement_agreement_route_line,base.group_user,1,1,1,1
+access_agreement_record_agreement,access_agreement_record_agreement,model_alfaleads_agreement_record_agreement,base.group_user,1,1,1,1
