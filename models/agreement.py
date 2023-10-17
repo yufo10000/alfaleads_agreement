@@ -20,11 +20,11 @@ class AbstractAgreement(models.AbstractModel):
     AGREEMENT_MODEL = ""
     AGREEMENT_VIEW_REF = ""
 
-    agreement = fields.Many2one(
+    agreement_id = fields.Many2one(
         string="Agreement",
         comodel_name="alfaleads_agreement.agreement",
     )
-    active_agreement_processes = fields.Many2one(
+    active_agreement_processes_id = fields.Many2one(
         comodel_name="alfaleads_agreement.agreement_process",
         string="Active agreement processes",
         compute="_compute_active_agreement_processes",
@@ -32,47 +32,48 @@ class AbstractAgreement(models.AbstractModel):
     )
     active_agreement_status = fields.Selection(
         compute="_compute_active_agreement_status",
-        related="active_agreement_processes.status",
+        related="active_agreement_processes_id.status",
     )
     has_agreement_route = fields.Boolean(
         string="Has agreement steps", compute="_compute_has_agreement_route"
     )
 
-    @api.depends("active_agreement_processes")
+    @api.depends("active_agreement_processes_id")
     def _compute_has_agreement_route(self):
         for rec in self:
             rec.has_agreement_route = False
-            if rec.active_agreement_processes:
-                rec.has_agreement_route = bool(rec.active_agreement_processes.route)
+            if rec.active_agreement_processes_id:
+                rec.has_agreement_route = bool(rec.active_agreement_processes_id.route)
 
-    @api.depends("active_agreement_processes")
+    @api.depends("active_agreement_processes_id")
     def _compute_active_agreement_status(self):
         for rec in self:
             rec.has_agreement_in_draft = False
-            if rec.active_agreement_processes:
-                rec.has_agreement_in_draft = rec.active_agreement_processes.status
+            if rec.active_agreement_processes_id:
+                rec.has_agreement_in_draft = rec.active_agreement_processes_id.status
 
     @api.depends(
-        "agreement.agreement_processes", "agreement.agreement_processes.status"
+        "agreement_id.agreement_processes_ids",
+        "agreement_id.agreement_processes_ids.status",
     )
     def _compute_active_agreement_processes(self):
         for rec in self:
-            rec.active_agreement_processes = False
-            agreement = rec.agreement.agreement_processes.sorted(
+            rec.active_agreement_processes_id = False
+            agreement = rec.agreement_id.agreement_processes_ids.sorted(
                 key=lambda x: x.create_date
             )
             if agreement:
-                rec.active_agreement_processes = agreement[-1]
+                rec.active_agreement_processes_id = agreement[-1]
 
     def action_send_to_approve(self):
         self.ensure_one()
-        agreement_processes = self.active_agreement_processes
+        agreement_processes = self.active_agreement_processes_id
         if agreement_processes.filtered(
             lambda x: x.status
             in [AgreementStatus.DRAFT.value, AgreementStatus.IN_PROGRESS.value]
         ):
             raise UserError("Сan be only one active approval process")
-        if not self.agreement:
+        if not self.agreement_id:
             self.agreement = self.env["alfaleads_agreement.agreement"].create(
                 {
                     "lines_attribute_name": self.lines_attribute_name,
@@ -81,41 +82,44 @@ class AbstractAgreement(models.AbstractModel):
             )
         new_agreement_process = self.env[
             "alfaleads_agreement.agreement_process"
-        ].create({"agreement": self.agreement.id})
-        if self.active_agreement_processes:
+        ].create({"agreement_id": self.agreement_id.id})
+        if self.active_agreement_processes_id:
             route_ids = [
-                route.copy({"approvers": [(6, 0, route.approvers.ids)]}).id
-                for route in agreement_processes.route
+                route.copy({"approvers_ids": [(6, 0, route.approvers_ids.ids)]}).id
+                for route in agreement_processes.route_ids
             ]
-            new_agreement_process.route = [(6, 0, route_ids)]
+            new_agreement_process.route_ids = [(6, 0, route_ids)]
 
     def action_start_approving(self):
         self.ensure_one()
         if self.active_agreement_status != AgreementStatus.DRAFT.value:
             raise UserError("There are no active approval processes in 'Draft' status")
-        self.active_agreement_processes.start()
+        self.active_agreement_processes_id.start()
 
     def action_open_agreement_process(self):
         self.ensure_one()
-        if not self.active_agreement_processes:
+        if not self.active_agreement_processes_id:
             raise UserError("There are no active approval processes at the moment")
         return {
             "name": "Payment request",
             "view_mode": "form",
             "target": "current",
             "views": [(False, "form")],
-            "res_id": self.active_agreement_processes.id,
+            "res_id": self.active_agreement_processes_id.id,
             "res_model": "alfaleads_agreement.agreement_process",
             "type": "ir.actions.act_window",
         }
 
     def action_open_agreement(self):
         self.ensure_one()
-        if not self.active_agreement_processes:
+        if not self.active_agreement_processes_id:
             raise UserError("There are no active approval processes at the moment")
-        record_agreements = self.active_agreement_processes.record_agreements.filtered(
-            lambda x: x.task.idx == self.active_agreement_processes.current_step
-            and x.task.approver == self.env.user
+        record_agreements = (
+            self.active_agreement_processes_id.record_agreements_ids.filtered(
+                lambda x: x.task_id.idx
+                          == self.active_agreement_processes_id.current_step
+                          and x.task_id.approver_id == self.env.user
+            )
         )
         if not record_agreements:
             raise UserError("You don't need to confirm")
@@ -133,16 +137,16 @@ class AbstractAgreement(models.AbstractModel):
             "context": {
                 "budget_id": self.id,
                 "tree_view_ref": self.AGREEMENT_VIEW_REF,
-                "agreement": self.active_agreement_processes.id,
+                "agreement_id": self.active_agreement_processes_id.id,
                 "create": False,
                 "edit": False,
             },
         }
 
     def _get_task_by_approver(self):
-        return self.active_agreement_processes.tasks.filtered(
-            lambda x: x.idx == self.active_agreement_processes.current_step
-            and x.approver == self.env.user
+        return self.active_agreement_processes_id.tasks_ids.filtered(
+            lambda x: x.idx == self.active_agreement_processes_id.current_step
+                      and x.approver_id == self.env.user
             and x.status == "waiting"
         )
 
@@ -170,8 +174,8 @@ class AbstractAgreement(models.AbstractModel):
 
     def agreement_cancel(self):
         for rec in self:
-            if rec.active_agreement_processes:
-                rec.active_agreement_processes.cancel()
+            if rec.active_agreement_processes_id:
+                rec.active_agreement_processes_id.cancel()
 
     def set_approve_by_lines(self, lines):
         self.ensure_one()
@@ -204,8 +208,9 @@ class Agreement(models.Model):
         selection="_select_target_model", string="Source Record"
     )
     lines_attribute_name = fields.Char(string="Lines attribute name")
-    agreement_processes = fields.One2many(
-        comodel_name="alfaleads_agreement.agreement_process", inverse_name="agreement"
+    agreement_processes_ids = fields.One2many(
+        comodel_name="alfaleads_agreement.agreement_process",
+        inverse_name="agreement_id",
     )
 
     @api.model
@@ -220,20 +225,20 @@ class AgreementProcess(models.Model):
     _name = "alfaleads_agreement.agreement_process"
     _description = "Agreement Process"
 
-    agreement = fields.Many2one(
+    agreement_id = fields.Many2one(
         comodel_name="alfaleads_agreement.agreement", ondelete="cascade"
     )
-    steps = fields.One2many(
+    steps_ids = fields.One2many(
         comodel_name="alfaleads_agreement.agreement_step",
-        inverse_name="agreement_process",
+        inverse_name="agreement_process_id",
     )
-    tasks = fields.One2many(
+    tasks_ids = fields.One2many(
         comodel_name="alfaleads_agreement.agreement_task",
-        inverse_name="agreement_process",
+        inverse_name="agreement_process_id",
     )
-    record_agreements = fields.One2many(
+    record_agreements_ids = fields.One2many(
         comodel_name="alfaleads_agreement.record_agreement",
-        inverse_name="agreement_process",
+        inverse_name="agreement_process_id",
     )
     status = fields.Selection(
         selection=[
@@ -246,9 +251,9 @@ class AgreementProcess(models.Model):
         string="Agreement status",
         default="draft",
     )
-    route = fields.One2many(
+    route_ids = fields.One2many(
         comodel_name="alfaleads_agreement.agreement_route_line",
-        inverse_name="agreement",
+        inverse_name="agreement_id",
     )
 
     current_step = fields.Integer(string="Current step", readonly=True, default=0)
@@ -259,7 +264,7 @@ class AgreementProcess(models.Model):
 
     def _start(self):
         self.ensure_one()
-        if not self.route:
+        if not self.route_ids:
             return
         self.create_next_step()
         self.status = "in_progress"
@@ -270,28 +275,28 @@ class AgreementProcess(models.Model):
             return
 
         step = self.current_step + 1
-        route_line = self.route.filtered(lambda r: r.idx == step)
+        route_line = self.route_ids.filtered(lambda r: r.idx == step)
         self.decline_lines()
         if not route_line and step > 1:
             return self.finish()
         if not route_line and step == 1:
             raise ValueError("No data for the first step of approval")
         self.env["alfaleads_agreement.agreement_step"].create(
-            [{"idx": step, "agreement_process": self.id}], route_line[0]
+            [{"idx": step, "agreement_process_id": self.id}], route_line[0]
         )
         self.current_step = step
 
     def decline_lines(self):
-        for record_agreement in self.record_agreements.filtered(
-            lambda x: self.current_step == x.task.idx and x.status == "declined"
+        for record_agreement in self.record_agreements_ids.filtered(
+                lambda x: self.current_step == x.task_id.idx and x.status == "declined"
         ):
             record_agreement.related_record.decline()
 
     def finish(self):
         # TODO: check all steps and tasks has status APPROVED
         amount_approved = {}
-        for record_agreement in self.record_agreements.filtered(
-            lambda x: self.current_step == x.task.idx
+        for record_agreement in self.record_agreements_ids.filtered(
+                lambda x: self.current_step == x.task_id.idx
         ):
             if record_agreement.status == "approved":
                 if record_agreement.related_record not in amount_approved:
@@ -300,8 +305,8 @@ class AgreementProcess(models.Model):
                     amount_approved[record_agreement.related_record] += 1
         for related_record in amount_approved:
             if amount_approved[related_record] == len(
-                self.record_agreements.filtered(
-                    lambda x: self.current_step == x.task.idx
+                self.record_agreements_ids.filtered(
+                    lambda x: self.current_step == x.task_id.idx
                     and related_record == x.related_record
                 )
             ):
@@ -312,7 +317,7 @@ class AgreementProcess(models.Model):
         self.write({"status": AgreementStatus.CANCELLED.value})
 
     def decline(self):
-        for record_agreement in self.record_agreements:
+        for record_agreement in self.record_agreements_ids:
             record_agreement.related_record.decline()
         self.write({"status": AgreementStatus.DECLINED.value})
 
@@ -321,32 +326,33 @@ class AgreementStep(models.Model):
     _name = "alfaleads_agreement.agreement_step"
     _description = "Agreement Step"
     idx = fields.Integer(string="Order")
-    agreement_process = fields.Many2one(
+    agreement_process_id = fields.Many2one(
         comodel_name="alfaleads_agreement.agreement_process"
     )
-    tasks = fields.One2many(
-        comodel_name="alfaleads_agreement.agreement_task", inverse_name="agreement_step"
+    tasks_ids = fields.One2many(
+        comodel_name="alfaleads_agreement.agreement_task",
+        inverse_name="agreement_step_id",
     )
 
     def create(self, vals_list, route_line=None):
         records = super().create(vals_list)
-        if route_line and route_line.approvers:
+        if route_line and route_line.approvers_ids:
             for record in records:
-                record._create_tasks(route_line.approvers)
+                record._create_tasks(route_line.approvers_ids)
         return records
 
     def _create_tasks(self, approvers):
         self.ensure_one()
         for approver in approvers:
             self.env["alfaleads_agreement.agreement_task"].create(
-                [{"agreement_step": self.id, "approver": approver.id}]
+                [{"agreement_step_id": self.id, "approver_id": approver.id}]
             )
 
     def try_move_to_next_step(self):
         for rec in self:
-            approved_tasks = rec.tasks.filtered(lambda x: x.status == "approved")
-            if len(rec.tasks) == len(approved_tasks):
-                rec.agreement_process.create_next_step()
+            approved_tasks = rec.tasks_ids.filtered(lambda x: x.status == "approved")
+            if len(rec.tasks_ids) == len(approved_tasks):
+                rec.agreement_process_id.create_next_step()
 
 
 class AgreementTask(models.Model):
@@ -355,14 +361,18 @@ class AgreementTask(models.Model):
 
     _inherit = ["mail.thread", "mail.activity.mixin"]
 
-    agreement_step = fields.Many2one(comodel_name="alfaleads_agreement.agreement_step")
-    idx = fields.Integer(related="agreement_step.idx")
-    agreement_process = fields.Many2one(related="agreement_step.agreement_process")
-    record_agreements = fields.One2many(
-        comodel_name="alfaleads_agreement.record_agreement",
-        inverse_name="task",
+    agreement_step_id = fields.Many2one(
+        comodel_name="alfaleads_agreement.agreement_step"
     )
-    approver = fields.Many2one(comodel_name="res.users", string="Approver")
+    idx = fields.Integer(related="agreement_step_id.idx")
+    agreement_process_id = fields.Many2one(
+        related="agreement_step_id.agreement_process_id"
+    )
+    record_agreements_ids = fields.One2many(
+        comodel_name="alfaleads_agreement.record_agreement",
+        inverse_name="task_id",
+    )
+    approver_id = fields.Many2one(comodel_name="res.users", string="Approver")
     status = fields.Selection(
         selection=[
             ("waiting", "Waiting for approval"),
@@ -383,37 +393,37 @@ class AgreementTask(models.Model):
     def create_lines_agreement(self):
         self.ensure_one()
         if (
-            self.agreement_process.agreement.lines_attribute_name
-            and self.agreement_process.agreement.related_record
+            self.agreement_process_id.agreement_id.lines_attribute_name
+            and self.agreement_process_id.agreement_id.related_record
         ):
             self._create_lines_agreement()
 
     def _create_lines_agreement(self):
         lines = getattr(
-            self.agreement_process.agreement.related_record,
-            self.agreement_process.agreement.lines_attribute_name,
+            self.agreement_process_id.agreement_id.related_record,
+            self.agreement_process_id.agreement_id.lines_attribute_name,
         )
         self.env["alfaleads_agreement.record_agreement"].create(
             [
-                {"task": self.id, "related_record": "%s,%s" % (line._name, line.id)}
+                {"task_id": self.id, "related_record": "%s,%s" % (line._name, line.id)}
                 for line in lines
             ]
         )
         for line in lines:
-            if hasattr(line, "agreement_process"):
-                line.agreement_process = self.agreement_process
+            if hasattr(line, "agreement_process_id"):
+                line.agreement_process_id = self.agreement_process_id
 
     def decline(self):
         self.write({"status": "declined"})
         for rec in self:
-            rec.agreement_process.decline()
+            rec.agreement_process_id.decline()
 
     def save(self):
         self.write({"status": "approved"})
         for rec in self:
-            record_agreements = rec.record_agreements.filtered(
-                lambda x: x.task.idx == x.agreement_process.current_step
-                and x.task.approver == self.env.user
+            record_agreements = rec.record_agreements_ids.filtered(
+                lambda x: x.task_id.idx == x.agreement_process_id.current_step
+                          and x.task_id.approver_id == self.env.user
             )
             waiting_record_agreements = record_agreements.filtered(
                 lambda x: x.status == "waiting"
@@ -426,22 +436,22 @@ class AgreementTask(models.Model):
             if len(record_agreements) == len(declined_record_agreements):
                 rec.decline()
             else:
-                rec.agreement_step.try_move_to_next_step()
+                rec.agreement_step_id.try_move_to_next_step()
 
     def set_approve_by_lines(self, lines):
         for record in self:
-            for record_agreement in record.record_agreements.filtered(
-                lambda x: x.task.idx == x.agreement_process.current_step
-                and x.task.approver == self.env.user
+            for record_agreement in record.record_agreements_ids.filtered(
+                lambda x: x.task_id.idx == x.agreement_process_id.current_step
+                and x.task_id.approver_id == self.env.user
             ):
                 if record_agreement.related_record in lines:
                     record_agreement.approve()
 
     def set_decline_by_lines(self, lines):
         for record in self:
-            for record_agreement in record.record_agreements.filtered(
-                lambda x: x.task.idx == x.agreement_process.current_step
-                and x.task.approver == self.env.user
+            for record_agreement in record.record_agreements_ids.filtered(
+                lambda x: x.task_id.idx == x.agreement_process_id.current_step
+                and x.task_id.approver_id == self.env.user
             ):
                 if record_agreement.related_record in lines:
                     record_agreement.decline()
@@ -451,11 +461,11 @@ class RecordAgreement(models.Model):
     _name = "alfaleads_agreement.record_agreement"
     _description = "Records Agreement"
 
-    task = fields.Many2one(comodel_name="alfaleads_agreement.agreement_task")
+    task_id = fields.Many2one(comodel_name="alfaleads_agreement.agreement_task")
     related_record = fields.Reference(
         selection="_select_target_model", string="Source Record"
     )
-    agreement_process = fields.Many2one(related="task.agreement_process")
+    agreement_process_id = fields.Many2one(related="task_id.agreement_process_id")
 
     @api.model
     def _select_target_model(self):

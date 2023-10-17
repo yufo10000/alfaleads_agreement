@@ -8,7 +8,7 @@
     "website": "",
     "category": "Accounting/Accounting",
     "license": "LGPL-3",
-    "version": "15.0.1.1",
+    "version": "15.0.1.2",
     "depends": [
         "web",
         "base",
