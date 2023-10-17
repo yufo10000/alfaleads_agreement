@@ -22,9 +22,6 @@ class RouteLine(models.Model):
     _description = "Agreement Route Line"
 
     idx = fields.Integer(string="Order", default=DEFAULT_IDX)
-    route_ref = fields.Many2one(comodel_name="alfaleads_agreement.agreement_route_ref")
-    agreement = fields.Many2one(comodel_name="alfaleads_agreement.agreement_process")
-    approvers_ids = fields.Many2many(comodel_name="res.users", string="Approvers")
     route_ref_id = fields.Many2one(
         comodel_name="alfaleads_agreement.agreement_route_ref"
     )
