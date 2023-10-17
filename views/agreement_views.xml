@@ -12,8 +12,8 @@
                 <sheet>
                     <group>
                         <field name="current_step" />
-                        <field name="route" />
-                        <field name="tasks" readonly="1" />
+                        <field name="route_ids" />
+                        <field name="tasks_ids" readonly="1" />
                     </group>
                 </sheet>
             </form>
@@ -27,7 +27,7 @@
             <tree editable="bottom" default_order="create_date">
                 <field name="create_date" invisible="1" />
                 <field name="idx" />
-                <field name="approvers" widget="many2many_tags" />
+                <field name="approvers_ids" widget="many2many_tags" />
             </tree>
         </field>
     </record>
@@ -39,7 +39,7 @@
             <tree default_order="create_date">
                 <field name="create_date" invisible="1" />
                 <field name="idx" />
-                <field name="approver" />
+                <field name="approver_id" />
                 <field name="status" />
                 <field name="approver_comments" />
             </tree>
