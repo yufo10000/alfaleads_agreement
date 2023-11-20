@@ -10,12 +10,12 @@
     "license": "LGPL-3",
     "version": "16.0.1.1",
     "depends": [
+        "alfaleads",
         "web",
         "base",
         "mail",
         "odoo_rest",
         "queue_job",
-        "alfaleads_utils",
     ],
     "data": [
         "security/ir.model.access.csv",
